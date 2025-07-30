@@ -1,7 +1,7 @@
 ﻿import {type ReactNode, useEffect} from "react";
-import useFrameRegistryContext from "./useFrameRegistryContext.ts";
-import frameMessageBus from "./frameMessageBus.ts";
-import {isFrameMessage} from "./types.ts";
+import useFrameRegistryContext from "./useFrameRegistryContext";
+import frameMessageBus from "./frameMessageBus";
+import {isFrameMessage} from "./FrameMessage";
 
 type Props = {
   children: ReactNode;
@@ -18,8 +18,6 @@ const FrameMessageListener = ({ children }: Props) => {
     function handleMessage(event: MessageEvent) {
       if (!event.source)
         return;
-
-      console.log(event.data);
 
       const frame = getFrame(event.source as Window);
       if (!frame)

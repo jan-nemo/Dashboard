@@ -1,5 +1,5 @@
 import {useEffect, useState} from "react";
-import Frame from "./Frame.tsx";
+import FrameContainer from "./FrameContainer.tsx";
 import FrameRegistryProvider from "./FrameRegistryProvider.tsx";
 import FrameMessageListener from "./FrameMessageListener.tsx";
 import frameMessageBus from "./frameMessageBus.ts";
@@ -66,16 +66,21 @@ const BroadcastFrameMessageHandler = () => {
   type BroadcastFrameMessage = { type: `BROADCAST/${string}`; [key: string]: unknown };
 
   useEffect(() => frameMessageBus.subscribe(
-    (message): message is BroadcastFrameMessage => message.type.startsWith('BROADCAST'),
+    (message): message is BroadcastFrameMessage => message.type.startsWith('BROADCAST/'),
     (message, sender) => {
-      for (const otherFrame of getFrames()) {
-        if (otherFrame === sender)
+      const broadcastedMessage = {
+        ...message,
+        type: 'BROADCASTED/' + message.type.substring('BROADCAST/'.length),
+      };
+
+      for (const frame of getFrames()) {
+        if (frame === sender)
           continue;
 
-        otherFrame.postMessage({
-          ...message,
-          type: 'BROADCASTED/' + message.type.substring('BROADCAST/'.length),
-        });
+        if (!frame.connected)
+          return;
+
+        frame.postMessage(broadcastedMessage);
       }
     }
   ), [getFrames]);
@@ -105,7 +110,7 @@ function App() {
           {widgets.map((widget, index) => {
             return (
               <div key={index}>
-                <Frame url={widget.url} style={{ width: widget.size.width, height: widget.size.height }} />
+                <FrameContainer url={widget.url} style={{ width: widget.size.width, height: widget.size.height }} />
               </div>
             );
           })}

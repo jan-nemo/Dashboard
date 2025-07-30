@@ -1,10 +1,4 @@
-﻿export type Frame = {
-  origin: string;
-  postMessage: <T extends FrameMessage>(message: T) => void;
-  connected: boolean
-};
-
-export type FrameMessage = {
+﻿export type FrameMessage = {
   type: string;
 };
 

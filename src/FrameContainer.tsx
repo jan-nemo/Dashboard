@@ -1,12 +1,13 @@
 ﻿import {type CSSProperties, useEffect, useRef} from "react";
 import useFrameRegistryContext from "./useFrameRegistryContext.ts";
+import Frame from "./Frame.ts";
 
 type Props = {
   url: string;
   style: CSSProperties
 }
 
-const Frame = ({ url, style }: Props) => {
+const FrameContainer = ({ url, style }: Props) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const { registerFrame, unregisterFrame } = useFrameRegistryContext();
 
@@ -15,8 +16,10 @@ const Frame = ({ url, style }: Props) => {
     if (!window)
       return;
 
-    const origin = new URL(url).origin;
-    registerFrame(window, origin);
+    registerFrame(
+      window, 
+      new Frame(window, new URL(url).origin)
+    );
 
     return () => unregisterFrame(window);
   }, [registerFrame, unregisterFrame, url]);
@@ -28,4 +31,4 @@ const Frame = ({ url, style }: Props) => {
   />
 };
 
-export default Frame;
+export default FrameContainer;

@@ -1,6 +1,6 @@
 ﻿import {type ReactNode, useCallback, useMemo, useRef} from "react";
-import FrameRegistryContext from "./FrameRegistryContext.ts";
-import type {Frame} from "./types.ts";
+import FrameRegistryContext from "./FrameRegistryContext";
+import type Frame from "./Frame";
 
 type Props = {
   children: ReactNode;
@@ -9,12 +9,8 @@ type Props = {
 const FrameRegistryProvider = ({ children }: Props) => {
   const registryRef = useRef<Map<Window, Frame>>(new Map());
 
-  const registerFrame = useCallback((window: Window, origin: string) => {
-    registryRef.current.set(window, {
-      origin,
-      postMessage: message => window.postMessage(message, origin),
-      connected: false
-    });
+  const registerFrame = useCallback((window: Window, frame: Frame) => {
+    registryRef.current.set(window, frame);
   }, []);
   const unregisterFrame = useCallback((window: Window) => {
     registryRef.current.delete(window);

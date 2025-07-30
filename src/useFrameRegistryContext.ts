@@ -1,5 +1,5 @@
 ﻿import {useContext} from "react";
-import FrameRegistryContext from "./FrameRegistryContext.ts";
+import FrameRegistryContext from "./FrameRegistryContext";
 
 const useFrameRegistryContext = () => {
   const context = useContext(FrameRegistryContext);
