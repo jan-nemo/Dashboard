@@ -1,5 +1,5 @@
 import {useEffect, useState} from "react";
-import FrameContainer from "./FrameContainer.tsx";
+import FrameContainer from "./Widget.tsx";
 import FrameRegistryProvider from "./FrameRegistryProvider.tsx";
 import FrameConnectionHandler from "./FrameConnectionHandler.tsx";
 import frameMessageBus from "./frameMessageBus.ts";

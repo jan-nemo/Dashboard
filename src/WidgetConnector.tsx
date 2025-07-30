@@ -1,17 +1,13 @@
-﻿import {type ReactNode, useCallback, useEffect, useMemo, useRef} from "react";
-import FrameRegistryContext from "./FrameRegistryContext";
+﻿import {createContext, type ReactNode, useCallback, useContext, useEffect, useRef} from "react";
 import {type WidgetMessage, isWidgetMessage} from "./WidgetMessage.ts";
-import frameMessageBus from "./frameMessageBus.ts";
 
-
-type WidgetRegistrationId = string;
+type WidgetRegistrationId = unknown;
 
 class WidgetRegistration {
   readonly id: WidgetRegistrationId;
   readonly origin: string;
 
-  constructor(id: WidgetRegistrationId, origin: string) {
-    this.id = id;
+  constructor(origin: string) {
     this.origin = origin;
   }
 }
@@ -43,8 +39,25 @@ class WidgetMessageChannel {
 }
 
 interface WidgetConnection {
-  publish(message: WidgetMessage): void;
-  subscribe(handler: (message: WidgetMessage) => void): void;
+  postMessage(message: WidgetMessage): void;
+}
+
+type WidgetConnector = {
+  connect: (window: Window, origin: string) => () => void;
+};
+
+const WidgetConnectorContext = createContext<WidgetConnector | null>(null);
+
+export const useWidgetConnect = () => {
+  const context = useContext(WidgetConnectorContext);
+  if (!context)
+    throw new Error('useWidgetConnector must be used within a WidgetConnectorProvider');
+
+  return context.connect;
+}
+
+export const useWidgetConnection = (id: WidgetRegistrationId) => {
+
 }
 
 type Props = {
@@ -56,17 +69,17 @@ type Props = {
 
 const WidgetConnector = ({ children, onAdded, onRemoved, onMessage }: Props) => {
   const widgetRegistrationsRef = useRef<Map<Window, WidgetRegistration>>(new Map());
-  const widgetMessageChannelsRef = useRef<Map<WidgetRegistrationId, WidgetMessageChannel>>(new Map());
-  const widgetConnectionsRef = useRef<Map<WidgetRegistrationId, WidgetConnection>>(new Map());
+  const widgetMessageChannelsRef = useRef<Map<WidgetRegistration, WidgetMessageChannel>>(new Map());
+  const widgetConnectionsRef = useRef<Map<WidgetRegistration, WidgetConnection>>(new Map());
 
-  const connect = useCallback((id: string, window: Window, origin: string) => {
-    const widgetRegistration = new WidgetRegistration(id, origin);
+  const connect = useCallback((window: Window, origin: string) => {
+    const widgetRegistration = new WidgetRegistration(origin);
 
     widgetRegistrationsRef.current.set(window, widgetRegistration);
 
     return () => {
-      widgetMessageChannelsRef.current.get(widgetRegistration.id)?.close();
-      widgetMessageChannelsRef.current.delete(widgetRegistration.id);
+      widgetMessageChannelsRef.current.get(widgetRegistration)?.close();
+      widgetMessageChannelsRef.current.delete(widgetRegistration);
 
       widgetRegistrationsRef.current.delete(window);
     };
@@ -95,14 +108,8 @@ const WidgetConnector = ({ children, onAdded, onRemoved, onMessage }: Props) => 
       if (message.type !== 'CONNECTION/OPEN')
         return;
 
-      let widgetMessageChannel = widgetMessageChannelsRef.current.get(widgetRegistration.id);
+      let widgetMessageChannel = widgetMessageChannelsRef.current.get(widgetRegistration);
       if (!widgetMessageChannel) {
-        const widgetConnection: WidgetConnection = {
-          publish(message: WidgetMessage) {
-          },
-          subscribe(handler: (message: WidgetMessage) => void) {
-          }
-        };
         widgetMessageChannel = new WidgetMessageChannel();
         widgetMessageChannel.port1.onmessage = event => {
           if (!isWidgetMessage(event.data))
@@ -110,8 +117,13 @@ const WidgetConnector = ({ children, onAdded, onRemoved, onMessage }: Props) => 
 
 
         };
+        widgetMessageChannelsRef.current.set(widgetRegistration, widgetMessageChannel);
 
-        widgetMessageChannelsRef.current.set(widgetRegistration.id, widgetMessageChannel);
+        const widgetConnection: WidgetConnection = {
+          postMessage(message: WidgetMessage) {
+            widgetMessageChannel.port1.postMessage(message);
+          }
+        };
       }
 
       event.source.postMessage({ type: "CONNECTION/OPENED" }, event.origin, [widgetMessageChannel.port2]);

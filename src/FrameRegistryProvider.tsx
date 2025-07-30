@@ -1,5 +1,5 @@
 ﻿import {type ReactNode, useCallback, useEffect, useMemo, useRef} from "react";
-import FrameRegistryContext from "./FrameRegistryContext";
+import WidgetConnectorContext from "./WidgetConnectorContext.ts";
 import Frame from "./Frame";
 import {type FrameMessage, isFrameMessage} from "./WidgetMessage.ts";
 import frameMessageBus from "./frameMessageBus.ts";
@@ -27,9 +27,9 @@ const FrameRegistryProvider = ({ children }: Props) => {
   }), [registerFrame, getFrame, getFrames]);
 
   return (
-    <FrameRegistryContext.Provider value={value}>
+    <WidgetConnectorContext.Provider value={value}>
       {children}
-    </FrameRegistryContext.Provider>
+    </WidgetConnectorContext.Provider>
   );
 };
 
