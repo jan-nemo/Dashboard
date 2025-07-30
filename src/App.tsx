@@ -1,9 +1,9 @@
 import {useEffect, useState} from "react";
 import FrameContainer from "./FrameContainer.tsx";
 import FrameRegistryProvider from "./FrameRegistryProvider.tsx";
-import FrameMessageListener from "./FrameMessageListener.tsx";
+import FrameConnectionHandler from "./FrameConnectionHandler.tsx";
 import frameMessageBus from "./frameMessageBus.ts";
-import useFrameRegistryContext from "./useFrameRegistryContext.ts";
+import useFrameRegistry from "./useFrameRegistry.ts";
 
 type Widget = {
   url: string;
@@ -61,7 +61,7 @@ const ConnectionFrameMessageHandler = () => {
 };
 
 const BroadcastFrameMessageHandler = () => {
-  const { getFrames } = useFrameRegistryContext();
+  const { getFrames } = useFrameRegistry();
 
   type BroadcastFrameMessage = { type: `BROADCAST/${string}`; [key: string]: unknown };
 
@@ -103,7 +103,7 @@ function App() {
 
   return (
     <FrameRegistryProvider>
-      <FrameMessageListener>
+      <FrameConnectionHandler>
         <ConnectionFrameMessageHandler />
         <BroadcastFrameMessageHandler />
         <div>
@@ -115,7 +115,7 @@ function App() {
             );
           })}
         </div>
-      </FrameMessageListener>
+      </FrameConnectionHandler>
     </FrameRegistryProvider>
   );
 }

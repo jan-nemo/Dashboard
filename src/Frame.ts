@@ -1,23 +1,11 @@
-import type {FrameMessage} from "./FrameMessage";
-
 export default class Frame {
-  private _window: Window;
-  private _origin: string;
+  private readonly _url: URL;
 
-  public connected: boolean;
-
-  get origin() {
-    return this._origin;
+  get url(): URL {
+    return this._url;
   }
 
-  constructor(window: Window, origin: string) {
-    this._window = window;
-    this._origin = origin;
-
-    this.connected = false;
-  }
-
-  postMessage<T extends FrameMessage>(message: T): void {
-    this._window.postMessage(message, this._origin);
+  constructor(url: URL) {
+    this._url = url;
   }
 }

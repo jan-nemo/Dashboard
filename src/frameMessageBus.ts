@@ -1,4 +1,4 @@
-﻿import type {FrameMessage} from "./FrameMessage";
+﻿import type {FrameMessage} from "./WidgetMessage.ts";
 import type Frame from "./Frame";
 
 type Handler<T extends FrameMessage = FrameMessage> = (message: T, sender: Frame) => void;

@@ -1,8 +1,8 @@
-﻿export type FrameMessage = {
+﻿export type WidgetMessage = {
   type: string;
 };
 
-export function isFrameMessage(message: unknown): message is FrameMessage {
+export function isWidgetMessage(message: unknown): message is WidgetMessage {
   if (!message)
     return false;
 

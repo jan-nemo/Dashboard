@@ -1,5 +1,5 @@
 ﻿import {type CSSProperties, useEffect, useRef} from "react";
-import useFrameRegistryContext from "./useFrameRegistryContext.ts";
+import useFrameRegistry from "./useFrameRegistry";
 import Frame from "./Frame.ts";
 
 type Props = {
@@ -9,20 +9,20 @@ type Props = {
 
 const FrameContainer = ({ url, style }: Props) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-  const { registerFrame, unregisterFrame } = useFrameRegistryContext();
+  const { registerFrame } = useFrameRegistry();
 
   useEffect(() => {
     const window = iframeRef.current?.contentWindow;
     if (!window)
       return;
 
-    registerFrame(
+    const unregisterFrame = registerFrame(
       window, 
-      new Frame(window, new URL(url).origin)
+      new Frame(new URL(url).origin)
     );
 
-    return () => unregisterFrame(window);
-  }, [registerFrame, unregisterFrame, url]);
+    return () => unregisterFrame();
+  }, [registerFrame, url]);
 
   return <iframe
     src={url}

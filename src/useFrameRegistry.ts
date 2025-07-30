@@ -1,12 +1,12 @@
 ﻿import {useContext} from "react";
 import FrameRegistryContext from "./FrameRegistryContext";
 
-const useFrameRegistryContext = () => {
+const useFrameRegistry = () => {
   const context = useContext(FrameRegistryContext);
   if (!context)
-    throw new Error('useFrameRegistryContext must be used within a FrameRegistryProvider');
+    throw new Error('useFrameRegistry must be used within a FrameRegistryProvider');
 
   return context;
 };
 
-export default useFrameRegistryContext;
+export default useFrameRegistry;
