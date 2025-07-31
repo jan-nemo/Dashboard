@@ -4,6 +4,7 @@ import type {WidgetId} from "./WidgetId.ts";
 import useWidgetMessageBus from "./useWidgetMessageBus.ts";
 import {filter, map} from "rxjs";
 import type {WidgetMessage} from "./WidgetMessage.ts";
+import {Recipient} from "./OutboundWidgetMessage.tsx";
 
 type Props = {
   id: WidgetId
@@ -46,6 +47,10 @@ function isTitleSetWidgetMessage(message: WidgetMessage): message is { type: 'RE
   return 'title'in message.payload && typeof message.payload.title == 'string';
 }
 
+function isFooWidgetMessage(message: WidgetMessage): message is { type: 'RESIZE', payload: { title: string } } {
+  return message.type === 'FOO'
+}
+
 const Widget = ({ id, url }: Props) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [title, setTitle] = useState<string | null>(null);
@@ -65,15 +70,17 @@ const Widget = ({ id, url }: Props) => {
   useEffect(() => {
     const subscription = messageBus.inboundMessage$.pipe(
       filter(inboundMessage => inboundMessage.sender === id),
-      map(inboundMessage => inboundMessage.message)
-    ).subscribe(message => {
-      if (isResizeWidgetMessage(message)) {
-        iframeRef.current!.style.width = message.payload.width;
-        iframeRef.current!.style.height = message.payload.height;
+    ).subscribe(inboundMessage => {
+      if (isResizeWidgetMessage(inboundMessage.message)) {
+        iframeRef.current!.style.width = inboundMessage.message.payload.width;
+        iframeRef.current!.style.height = inboundMessage.message.payload.height;
       }
-      if (isTitleSetWidgetMessage(message)) {
-        iframeRef.current!.title = message.payload.title;
-        setTitle(message.payload.title);
+      if (isTitleSetWidgetMessage(inboundMessage.message)) {
+        iframeRef.current!.title = inboundMessage.message.payload.title;
+        setTitle(inboundMessage.message.payload.title);
+      }
+      if (isFooWidgetMessage(inboundMessage.message)) {
+        messageBus.publish(({ recipient: Recipient.single(inboundMessage.sender), message: { type: 'BOO' } }))
       }
     });
 
