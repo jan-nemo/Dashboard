@@ -1,4 +1,4 @@
-import {useState} from "react";
+import {useCallback, useState} from "react";
 import type {WidgetId} from "./WidgetId.tsx";
 import WidgetConnector from "./WidgetConnector.tsx";
 import InboundWidgetMessageSubject from "./InboundWidgetMessageSubject.ts";
@@ -67,12 +67,40 @@ createWidgetMessageMiddleware(INBOUND_WIDGET_MESSAGE_SUBJECT, OUTBOUND_WIDGET_ME
 })
 
 function App() {
-  const [widgets] = useState<Widget[]>(WIDGETS);
+  const [widgets, setWidgets] = useState<Widget[]>(WIDGETS);
+
+  const handleRemove = useCallback((id: WidgetId) => {
+    setWidgets(widgets => {
+      return widgets.filter(widget => widget.id !== id);
+    })
+  }, []);
 
   return (
     <WidgetConnector inboundMessage$={INBOUND_WIDGET_MESSAGE_SUBJECT} outboundMessage$={OUTBOUND_WIDGET_MESSAGE_SUBJECT}>
       <div>
-        {widgets.map(widget => <Widget key={widget.id} id={widget.id} url={widget.url} />)}
+        {widgets.map(widget => (
+          <div key={widget.id} style={{ position: 'relative', display: 'inline-block' }}>
+            <Widget  id={widget.id} url={widget.url} />
+            <button
+              style={{
+                position: 'absolute',
+                top: 18,
+                right: 18,
+                zIndex: 10,
+                background: 'rgba(255,255,255,0.9)',
+                border: '1px solid #ccc',
+                borderRadius: 4,
+                padding: '4px 8px',
+                cursor: 'pointer',
+                fontSize: '14px',
+                lineHeight: 1,
+              }}
+              onClick={() => handleRemove(widget.id)}
+            >
+              Remove
+            </button>
+          </div>
+        ))}
       </div>
     </WidgetConnector>
   );
