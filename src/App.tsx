@@ -1,122 +1,69 @@
-import {useEffect, useState} from "react";
-import FrameContainer from "./Widget.tsx";
-import FrameRegistryProvider from "./FrameRegistryProvider.tsx";
-import FrameConnectionHandler from "./FrameConnectionHandler.tsx";
-import frameMessageBus from "./frameMessageBus.ts";
-import useFrameRegistry from "./useFrameRegistry.ts";
+import {useState} from "react";
+import type {WidgetId} from "./WidgetId.tsx";
+import WidgetConnector from "./WidgetConnector.tsx";
+import InboundWidgetMessageSubject from "./InboundWidgetMessageSubject.ts";
+import OutboundWidgetMessageSubject from "./OutboundWidgetMessageSubject.tsx";
+import Widget from "./Widget.tsx";
+import WidgetMessageBus from "./WidgetMessageBus.ts";
+import {filter, map, type OperatorFunction} from "rxjs";
+import type {WidgetMessage} from "./WidgetMessage.ts";
+import type {InboundWidgetMessage} from "./InboundWidgetMessage.tsx";
+import {Recipient} from "./OutboundWidgetMessage.tsx";
 
-type Widget = {
-  url: string;
-  size: {
-    width: string;
-    height: string;
-  }
+function inboundMessageOfType<T extends WidgetMessage>(messageTypeGuard: (message: WidgetMessage) => message is T): OperatorFunction<InboundWidgetMessage, InboundWidgetMessage & { message: T }> {
+  return source => source.pipe(
+    filter((inboundMessage): inboundMessage is InboundWidgetMessage & { message: T } => messageTypeGuard(inboundMessage.message))
+  );
 }
 
-const createWidget = (url: string, width: string = '100%', height: string = '300px') : Widget => {
-  return {
-    url,
-    size: {
-      width,
-      height
-    }
-  }
+type Widget = {
+  id: WidgetId;
+  url: string;
 };
+
+const createWidget = (url: string) : Widget => ({
+  id: crypto.randomUUID(),
+  url,
+});
 
 const WIDGETS: Widget[] = [
-  createWidget('http://localhost:5174'),
-  createWidget('http://localhost:5175/widget-b'),
-  createWidget('http://localhost:5174'),
-  createWidget('http://localhost:5176/widget-c'),
+  createWidget('http://localhost:5174/widget-b'),
+  createWidget('http://localhost:5174/widget-c'),
+  createWidget('http://localhost:5174/widget-b'),
+  createWidget('http://localhost:5174/widget-a'),
 ];
 
-const ConnectionFrameMessageHandler = () => {
-  type ConnectionOpenFrameMessage = { type: "CONNECTION/OPEN" };
+const INCOMING_WIDGET_MESSAGE_SUBJECT = new InboundWidgetMessageSubject();
+const OUTGOING_WIDGET_MESSAGE_SUBJECT = new OutboundWidgetMessageSubject();
 
-  useEffect(() => frameMessageBus.subscribe(
-    (message): message is ConnectionOpenFrameMessage => message.type == 'CONNECTION/OPEN',
-    (_, sender) => {
-      sender.postMessage({
-        type: "CONNECTION/OPENED",
-        payload: {
-          idToken: "<IDTOKEN>",
-          version: "1.0.0",
-          culture: { name: "en-US" }
-        }
-      });
-      sender.connected = true;
+const messageBus = new WidgetMessageBus(OUTGOING_WIDGET_MESSAGE_SUBJECT, INCOMING_WIDGET_MESSAGE_SUBJECT);
+
+function isBroadcastWidgetMessage(message: WidgetMessage): message is { type: `BROADCAST/${string}`, [key: string]: unknown } {
+  return message.type.startsWith('BROADCAST/');
+}
+
+messageBus.inboundMessage$.pipe(
+  inboundMessageOfType(isBroadcastWidgetMessage),
+  map(inboundMessage => ({
+    recipient: Recipient.all([inboundMessage.sender]),
+    message: {
+      ...inboundMessage.message,
+      type: `BROADCASTED/${inboundMessage.message.type.slice('BROADCAST/'.length)}`,
     }
-  ), []);
-
-  type ConnectionCloseFrameMessage = { type: "CONNECTION/CLOSE" };
-
-  useEffect(() => frameMessageBus.subscribe(
-    (message): message is ConnectionCloseFrameMessage => message.type == 'CONNECTION/CLOSE',
-    (_, sender) => {
-      sender.connected = false;
-    }
-  ), []);
-
-  return null;
-};
-
-const BroadcastFrameMessageHandler = () => {
-  const { getFrames } = useFrameRegistry();
-
-  type BroadcastFrameMessage = { type: `BROADCAST/${string}`; [key: string]: unknown };
-
-  useEffect(() => frameMessageBus.subscribe(
-    (message): message is BroadcastFrameMessage => message.type.startsWith('BROADCAST/'),
-    (message, sender) => {
-      const broadcastedMessage = {
-        ...message,
-        type: 'BROADCASTED/' + message.type.substring('BROADCAST/'.length),
-      };
-
-      for (const frame of getFrames()) {
-        if (frame === sender)
-          continue;
-
-        if (!frame.connected)
-          return;
-
-        frame.postMessage(broadcastedMessage);
-      }
-    }
-  ), [getFrames]);
-
-  return null;
-};
-
-
+  })),
+).subscribe(outboundMessage => {
+  messageBus.publish(outboundMessage);
+});
 
 function App() {
-  const [widgets, setWidgets] = useState<Widget[]>(WIDGETS);
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setWidgets(widgets => widgets.map(widget => ({ ...widget, idToken: crypto.randomUUID() })))
-    }, 5000)
-
-    return () => clearInterval(interval);
-  }, []);
+  const [widgets] = useState<Widget[]>(WIDGETS);
 
   return (
-    <FrameRegistryProvider>
-      <FrameConnectionHandler>
-        <ConnectionFrameMessageHandler />
-        <BroadcastFrameMessageHandler />
-        <div>
-          {widgets.map((widget, index) => {
-            return (
-              <div key={index}>
-                <FrameContainer url={widget.url} style={{ width: widget.size.width, height: widget.size.height }} />
-              </div>
-            );
-          })}
-        </div>
-      </FrameConnectionHandler>
-    </FrameRegistryProvider>
+    <WidgetConnector inboundMessage$={INCOMING_WIDGET_MESSAGE_SUBJECT} outboundMessage$={OUTGOING_WIDGET_MESSAGE_SUBJECT}>
+      <div>
+        {widgets.map(widget => <Widget key={widget.id} id={widget.id} url={widget.url} />)}
+      </div>
+    </WidgetConnector>
   );
 }
 
