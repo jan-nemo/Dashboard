@@ -1,13 +1,13 @@
-﻿import {createContext, type ReactNode, useCallback, useContext, useEffect, useRef} from "react";
+﻿import {createContext, type ReactNode, useCallback, useContext, useEffect, useMemo, useRef} from "react";
 import {type WidgetMessage, isWidgetMessage} from "./WidgetMessage.ts";
-
-type WidgetRegistrationId = unknown;
+import {Observable, Subject} from "rxjs";
 
 class WidgetRegistration {
-  readonly id: WidgetRegistrationId;
+  readonly id: WidgetId;
   readonly origin: string;
 
-  constructor(origin: string) {
+  constructor(id: WidgetId, origin: string) {
+    this.id = id;
     this.origin = origin;
   }
 }
@@ -38,12 +38,10 @@ class WidgetMessageChannel {
   }
 }
 
-interface WidgetConnection {
-  postMessage(message: WidgetMessage): void;
-}
-
 type WidgetConnector = {
-  connect: (window: Window, origin: string) => () => void;
+  connect: (id: WidgetId, window: Window, origin: string) => () => void;
+  messagePublisher: OutgoingWidgetMessagePublisher;
+  messageObservable: IncomingWidgetMessageObservable;
 };
 
 const WidgetConnectorContext = createContext<WidgetConnector | null>(null);
@@ -55,31 +53,79 @@ export const useWidgetConnect = () => {
 
   return context.connect;
 }
+export const useWidgetMessagePublisher = () => {
+  const context = useContext(WidgetConnectorContext);
+  if (!context)
+    throw new Error('useWidgetMessagePublisher must be used within a WidgetConnectorProvider');
 
-export const useWidgetConnection = (id: WidgetRegistrationId) => {
+  return context.messagePublisher;
+}
 
+export const useWidgetMessageObservable = () => {
+  const context = useContext(WidgetConnectorContext);
+  if (!context)
+    throw new Error('useWidgetMessagePublisher must be used within a WidgetConnectorProvider');
+
+  return context.messageObservable;
+}
+
+export type WidgetId = string;
+
+type IncomingWidgetMessage = {
+  sender: WidgetId;
+  message: WidgetMessage;
+};
+
+type OutgoingWidgetMessage = {
+  receiver: WidgetId;
+  message: WidgetMessage;
+}
+
+class IncomingWidgetMessageSubject extends Subject<IncomingWidgetMessage> {
+}
+
+class OutgoingWidgetMessageSubject extends Subject<OutgoingWidgetMessage> {
+}
+
+class OutgoingWidgetMessagePublisher {
+  private readonly _subject;
+
+  constructor(subject: OutgoingWidgetMessageSubject) {
+    this._subject = subject;
+  }
+
+  publish(outgoingWidgetMessage: OutgoingWidgetMessage): void {
+    this._subject.next(outgoingWidgetMessage);
+  }
+}
+
+class IncomingWidgetMessageObservable extends Observable<IncomingWidgetMessage> {
+  constructor(subject: IncomingWidgetMessageSubject) {
+    super(subscriber => subject.subscribe(subscriber));
+  }
 }
 
 type Props = {
   children: ReactNode;
-  onAdded: (widget: WidgetConnection) => void;
-  onRemoved: (frame: WidgetConnection) => void;
-  onMessage: (message: WidgetMessage, sender: WidgetConnection) => void;
+  incomingMessage$: IncomingWidgetMessageSubject;
+  outgoingMessage$: OutgoingWidgetMessageSubject;
 };
 
-const WidgetConnector = ({ children, onAdded, onRemoved, onMessage }: Props) => {
-  const widgetRegistrationsRef = useRef<Map<Window, WidgetRegistration>>(new Map());
-  const widgetMessageChannelsRef = useRef<Map<WidgetRegistration, WidgetMessageChannel>>(new Map());
-  const widgetConnectionsRef = useRef<Map<WidgetRegistration, WidgetConnection>>(new Map());
+const WidgetConnector = ({ children, incomingMessage$, outgoingMessage$ }: Props) => {
+  const outgoingMessagePublisherRef = useRef(new OutgoingWidgetMessagePublisher(outgoingMessage$));
+  const incomingMessageObservableRef = useRef(new IncomingWidgetMessageObservable(incomingMessage$));
 
-  const connect = useCallback((window: Window, origin: string) => {
-    const widgetRegistration = new WidgetRegistration(origin);
+  const widgetRegistrationsRef = useRef<Map<Window, WidgetRegistration>>(new Map());
+  const widgetMessageChannelsRef = useRef<Map<WidgetId, WidgetMessageChannel>>(new Map());
+
+  const connect = useCallback((id: WidgetId, window: Window, origin: string) => {
+    const widgetRegistration = new WidgetRegistration(id, origin);
 
     widgetRegistrationsRef.current.set(window, widgetRegistration);
 
     return () => {
-      widgetMessageChannelsRef.current.get(widgetRegistration)?.close();
-      widgetMessageChannelsRef.current.delete(widgetRegistration);
+      widgetMessageChannelsRef.current.get(id)?.close();
+      widgetMessageChannelsRef.current.delete(id);
 
       widgetRegistrationsRef.current.delete(window);
     };
@@ -108,25 +154,44 @@ const WidgetConnector = ({ children, onAdded, onRemoved, onMessage }: Props) => 
       if (message.type !== 'CONNECTION/OPEN')
         return;
 
-      let widgetMessageChannel = widgetMessageChannelsRef.current.get(widgetRegistration);
+      let widgetMessageChannel = widgetMessageChannelsRef.current.get(widgetRegistration.id);
       if (!widgetMessageChannel) {
         widgetMessageChannel = new WidgetMessageChannel();
         widgetMessageChannel.port1.onmessage = event => {
-          if (!isWidgetMessage(event.data))
+          const message = event.data;
+          if (!isWidgetMessage(message))
             return;
 
-
+          incomingMessage$.next({ message, sender: widgetRegistration.id })
         };
-        widgetMessageChannelsRef.current.set(widgetRegistration, widgetMessageChannel);
-
-        const widgetConnection: WidgetConnection = {
-          postMessage(message: WidgetMessage) {
-            widgetMessageChannel.port1.postMessage(message);
-          }
-        };
+        widgetMessageChannelsRef.current.set(widgetRegistration.id, widgetMessageChannel);
       }
 
       event.source.postMessage({ type: "CONNECTION/OPENED" }, event.origin, [widgetMessageChannel.port2]);
     }
-  }, []);
+  }, [incomingMessage$]);
+
+  useEffect(() => {
+    const subscription = outgoingMessage$.subscribe(outgoingMessage => {
+      const { message, receiver } = outgoingMessage;
+
+      widgetMessageChannelsRef.current.get(receiver)?.port1.postMessage(message);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [outgoingMessage$]);
+
+  const value = useMemo(() => ({
+    connect,
+    messagePublisher: outgoingMessagePublisherRef.current,
+    messageObservable: incomingMessageObservableRef.current,
+  }), [connect])
+
+  return (
+    <WidgetConnectorContext.Provider value={value}>
+      {children}
+    </WidgetConnectorContext.Provider>
+  )
 }
+
+export default WidgetConnector;

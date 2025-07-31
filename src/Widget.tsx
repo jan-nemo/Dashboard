@@ -1,16 +1,14 @@
 ﻿import {type CSSProperties, useEffect, useRef} from "react";
-import {useWidgetConnect} from "./WidgetConnector.tsx";
+import {useWidgetConnect, type WidgetId} from "./WidgetConnector.tsx";
 
 type Props = {
+  id: WidgetId
   url: string;
   style: CSSProperties
 }
 
-const Widget = ({ url, style }: Props) => {
+const Widget = ({ id, url, style }: Props) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
-
-  const origin = new URL(url).origin;
-
   const connect = useWidgetConnect();
 
   useEffect(() => {
@@ -18,8 +16,10 @@ const Widget = ({ url, style }: Props) => {
     if (!window)
       return;
 
-    return connect(window, origin);
-  }, [connect, origin]);
+    const origin = new URL(url).origin;
+    
+    return connect(id, window, origin);
+  }, [connect, id, url]);
 
   return <iframe
     src={url}
