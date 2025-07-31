@@ -18,10 +18,7 @@ const Widget = ({ id, url }: Props) => {
 
   const connect = useWidgetConnector();
   useEffect(() => {
-    const window = iframeRef.current?.contentWindow;
-    if (!window)
-      return;
-
+    const window = iframeRef.current!.contentWindow!;
     const origin = new URL(url).origin;
     
     return connect(id, window, origin);
