@@ -2,7 +2,7 @@
 import useWidgetConnect from "./useWidgetConnect.ts";
 import type {WidgetId} from "./WidgetId.ts";
 import useWidgetMessageBus from "./useWidgetMessageBus.ts";
-import {filter, map} from "rxjs";
+import {filter} from "rxjs";
 import type {WidgetMessage} from "./WidgetMessage.ts";
 import {Recipient} from "./OutboundWidgetMessage.tsx";
 

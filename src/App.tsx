@@ -46,7 +46,7 @@ function rootMiddleware(inboundMessage$: Observable<InboundWidgetMessage>): Obse
         ...inboundMessage.message,
         type: `BROADCASTED/${inboundMessage.message.type.slice('BROADCAST/'.length)}`,
       }
-    }))
+    })),
   );
 
   const refreshIdToken$ = inboundMessage$.pipe(
