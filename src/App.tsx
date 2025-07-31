@@ -4,16 +4,11 @@ import WidgetConnector from "./WidgetConnector.tsx";
 import InboundWidgetMessageSubject from "./InboundWidgetMessageSubject.ts";
 import OutboundWidgetMessageSubject from "./OutboundWidgetMessageSubject.tsx";
 import Widget from "./Widget.tsx";
-import {filter, map, merge, type Observable, type OperatorFunction} from "rxjs";
+import {map, merge} from "rxjs";
 import type {WidgetMessage} from "./WidgetMessage.ts";
-import type {InboundWidgetMessage} from "./InboundWidgetMessage.tsx";
-import {type OutboundWidgetMessage, Recipient} from "./OutboundWidgetMessage.tsx";
-
-function ofType<T extends WidgetMessage>(messageTypeGuard: (message: WidgetMessage) => message is T): OperatorFunction<InboundWidgetMessage, InboundWidgetMessage & { message: T }> {
-  return source => source.pipe(
-    filter((inboundMessage): inboundMessage is InboundWidgetMessage & { message: T } => messageTypeGuard(inboundMessage.message))
-  );
-}
+import {Recipient} from "./OutboundWidgetMessage.tsx";
+import createWidgetMessageMiddleware from "./createWidgetMessageMiddleware.ts";
+import ofType from "./ofType.ts";
 
 type Widget = {
   id: WidgetId;
@@ -35,9 +30,7 @@ const WIDGETS: Widget[] = [
 const INBOUND_WIDGET_MESSAGE_SUBJECT = new InboundWidgetMessageSubject();
 const OUTBOUND_WIDGET_MESSAGE_SUBJECT = new OutboundWidgetMessageSubject();
 
-type WidgetMiddleware = (message$: Observable<InboundWidgetMessage>) => Observable<OutboundWidgetMessage>;
-
-function rootMiddleware(inboundMessage$: Observable<InboundWidgetMessage>): Observable<OutboundWidgetMessage> {
+createWidgetMessageMiddleware(INBOUND_WIDGET_MESSAGE_SUBJECT, OUTBOUND_WIDGET_MESSAGE_SUBJECT, inboundMessage$ => {
   const broadcast$ = inboundMessage$.pipe(
     ofType(isBroadcastWidgetMessage),
     map(inboundMessage => ({
@@ -71,19 +64,7 @@ function rootMiddleware(inboundMessage$: Observable<InboundWidgetMessage>): Obse
   function isRefreshIdTokenWidgetMessage(message: WidgetMessage): message is { type: `ID_TOKEN/REFRESH` } {
     return message.type == 'ID_TOKEN/REFRESH';
   }
-}
-
-function createMiddleware(
-  inboundMessage$: InboundWidgetMessageSubject,
-  outboundMessage$: OutboundWidgetMessageSubject,
-  rootMiddleware: WidgetMiddleware
-) {
-  rootMiddleware(inboundMessage$.asObservable()).subscribe(outboundMessage => {
-    outboundMessage$.next(outboundMessage);
-  });
-}
-
-createMiddleware(INBOUND_WIDGET_MESSAGE_SUBJECT, OUTBOUND_WIDGET_MESSAGE_SUBJECT, rootMiddleware)
+})
 
 function App() {
   const [widgets] = useState<Widget[]>(WIDGETS);

@@ -1,10 +1,9 @@
-﻿import {type ReactNode, useCallback, useEffect, useMemo, useRef} from "react";
+﻿import { type ReactNode, useCallback, useEffect, useMemo, useRef} from "react";
 import {isWidgetMessage} from "./WidgetMessage.ts";
 import type {WidgetId} from "./WidgetId.tsx";
 import type OutboundWidgetMessageSubject from "./OutboundWidgetMessageSubject.tsx";
 import type InboundWidgetMessageSubject from "./InboundWidgetMessageSubject.ts";
 import WidgetConnectorContext from "./WidgetConnectorContext.ts";
-import WidgetMessageBus from "./WidgetMessageBus.ts";
 
 class WidgetRegistration {
   readonly id: WidgetId;
@@ -49,7 +48,6 @@ type Props = {
 };
 
 const WidgetConnector = ({ children, inboundMessage$, outboundMessage$ }: Props) => {
-  const messageBus = useMemo(() => new WidgetMessageBus(outboundMessage$, inboundMessage$), [inboundMessage$, outboundMessage$]);
 
   const widgetRegistrationsRef = useRef<Map<Window, WidgetRegistration>>(new Map());
   const widgetMessageChannelsRef = useRef<Map<WidgetId, WidgetMessageChannel>>(new Map());
@@ -118,8 +116,9 @@ const WidgetConnector = ({ children, inboundMessage$, outboundMessage$ }: Props)
 
   const value = useMemo(() => ({
     connect,
-    messageBus
-  }), [connect, messageBus])
+    outboundMessage$,
+    inboundMessage$
+  }), [connect, outboundMessage$, inboundMessage$])
 
   return (
     <WidgetConnectorContext.Provider value={value}>
@@ -129,3 +128,4 @@ const WidgetConnector = ({ children, inboundMessage$, outboundMessage$ }: Props)
 }
 
 export default WidgetConnector;
+

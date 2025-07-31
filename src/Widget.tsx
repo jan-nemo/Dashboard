@@ -1,61 +1,22 @@
 ﻿import {useEffect, useRef, useState} from "react";
-import useWidgetConnect from "./useWidgetConnect.ts";
+import useWidgetConnector from "./useWidgetConnector.ts";
 import type {WidgetId} from "./WidgetId.ts";
-import useWidgetMessageBus from "./useWidgetMessageBus.ts";
-import {filter} from "rxjs";
+import {filter, ignoreElements, map, merge, tap} from "rxjs";
 import type {WidgetMessage} from "./WidgetMessage.ts";
 import {Recipient} from "./OutboundWidgetMessage.tsx";
+import useWidgetMessageMiddleware from "./useWidgetMessageMiddleware.ts";
+import ofType from "./ofType.ts";
 
 type Props = {
   id: WidgetId
   url: string;
 };
 
-function isResizeWidgetMessage(message: WidgetMessage): message is { type: 'RESIZE', payload: { width: string; height: string } } {
-  if (message.type !== 'RESIZE')
-    return false;
-
-  if (!('payload' in message))
-    return false;
-
-  if (typeof message.payload !== 'object')
-    return false;
-
-  if (!message.payload)
-    return false;
-
-  return (
-    ('height'in message.payload && typeof message.payload.height == 'string')
-    &&
-    ('width' in message.payload && typeof message.payload.width == 'string')
-  );
-}
-
-function isTitleSetWidgetMessage(message: WidgetMessage): message is { type: 'RESIZE', payload: { title: string } } {
-  if (message.type !== 'TITLE/SET')
-    return false;
-
-  if (!('payload' in message))
-    return false;
-
-  if (typeof message.payload !== 'object')
-    return false;
-
-  if (!message.payload)
-    return false;
-
-  return 'title'in message.payload && typeof message.payload.title == 'string';
-}
-
-function isFooWidgetMessage(message: WidgetMessage): message is { type: 'RESIZE', payload: { title: string } } {
-  return message.type === 'FOO'
-}
-
 const Widget = ({ id, url }: Props) => {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [title, setTitle] = useState<string | null>(null);
 
-  const connect = useWidgetConnect();
+  const connect = useWidgetConnector();
   useEffect(() => {
     const window = iframeRef.current?.contentWindow;
     if (!window)
@@ -66,26 +27,78 @@ const Widget = ({ id, url }: Props) => {
     return connect(id, window, origin);
   }, [connect, id, url]);
 
-  const messageBus = useWidgetMessageBus();
-  useEffect(() => {
-    const subscription = messageBus.inboundMessage$.pipe(
+  useWidgetMessageMiddleware(inboundMessage$ => {
+    const resizeWidget$ = inboundMessage$.pipe(
       filter(inboundMessage => inboundMessage.sender === id),
-    ).subscribe(inboundMessage => {
-      if (isResizeWidgetMessage(inboundMessage.message)) {
+      ofType(isResizeMessage),
+      tap(inboundMessage => {
         iframeRef.current!.style.width = inboundMessage.message.payload.width;
         iframeRef.current!.style.height = inboundMessage.message.payload.height;
-      }
-      if (isTitleSetWidgetMessage(inboundMessage.message)) {
+      }),
+      ignoreElements(),
+    );
+
+    const setTitle$ = inboundMessage$.pipe(
+      filter(inboundMessage => inboundMessage.sender === id),
+      ofType(isTitleSetMessage),
+      tap(inboundMessage => {
         iframeRef.current!.title = inboundMessage.message.payload.title;
         setTitle(inboundMessage.message.payload.title);
-      }
-      if (isFooWidgetMessage(inboundMessage.message)) {
-        messageBus.publish(({ recipient: Recipient.single(inboundMessage.sender), message: { type: 'BOO' } }))
-      }
-    });
+      }),
+      ignoreElements(),
+    );
 
-    return () => subscription.unsubscribe();
-  }, [id, messageBus]);
+    const foo$ = inboundMessage$.pipe(
+      filter(inboundMessage => inboundMessage.sender === id),
+      ofType(isFooMessage),
+      map(inboundMessage => ({
+        recipient: Recipient.single(inboundMessage.sender),
+        message: { type: 'BOO' }
+      })),
+    );
+
+    return merge(resizeWidget$, setTitle$, foo$);
+
+    function isResizeMessage(message: WidgetMessage): message is { type: 'RESIZE', payload: { width: string; height: string } } {
+      if (message.type !== 'RESIZE')
+        return false;
+
+      if (!('payload' in message))
+        return false;
+
+      if (typeof message.payload !== 'object')
+        return false;
+
+      if (!message.payload)
+        return false;
+
+      return (
+        ('height'in message.payload && typeof message.payload.height == 'string')
+        &&
+        ('width' in message.payload && typeof message.payload.width == 'string')
+      );
+    }
+
+    function isTitleSetMessage(message: WidgetMessage): message is { type: 'RESIZE', payload: { title: string } } {
+      if (message.type !== 'TITLE/SET')
+        return false;
+
+      if (!('payload' in message))
+        return false;
+
+      if (typeof message.payload !== 'object')
+        return false;
+
+      if (!message.payload)
+        return false;
+
+      return 'title'in message.payload && typeof message.payload.title == 'string';
+    }
+
+    function isFooMessage(message: WidgetMessage): message is { type: 'RESIZE', payload: { title: string } } {
+      return message.type === 'FOO'
+    }
+  }, [id]);
 
   return (
     <div style={{ margin: '10px' }}>
