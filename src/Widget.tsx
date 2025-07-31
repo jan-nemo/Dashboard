@@ -107,7 +107,6 @@ const Widget = ({ id, url }: Props) => {
         <iframe
           src={url}
           ref={iframeRef}
-          loading="lazy"
           style={{ border: '1px solid black', padding: '10px' }}
         />
       </div>
