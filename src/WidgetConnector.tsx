@@ -107,8 +107,8 @@ const WidgetConnector = ({ children, inboundMessage$, outboundMessage$ }: Props)
 
   useEffect(() => {
     const subscription = outboundMessage$.subscribe(outboundMessage => {
-      for (const { port1 } of outboundMessage.recipient.filter(widgetMessageChannelsRef.current))
-        port1.postMessage(outboundMessage.message);
+      for (const widgetMessageChannel of outboundMessage.recipient.filter(widgetMessageChannelsRef.current))
+        widgetMessageChannel.port1.postMessage(outboundMessage.message);
     });
 
     return () => subscription.unsubscribe();
