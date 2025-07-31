@@ -32,7 +32,7 @@ const OUTBOUND_WIDGET_MESSAGE_SUBJECT = new OutboundWidgetMessageSubject();
 
 createWidgetMessageMiddleware(INBOUND_WIDGET_MESSAGE_SUBJECT, OUTBOUND_WIDGET_MESSAGE_SUBJECT, inboundMessage$ => {
   const broadcast$ = inboundMessage$.pipe(
-    ofType(isBroadcastWidgetMessage),
+    ofType(isBroadcastMessage),
     map(inboundMessage => ({
       recipient: Recipient.all([inboundMessage.sender]),
       message: {
@@ -43,7 +43,7 @@ createWidgetMessageMiddleware(INBOUND_WIDGET_MESSAGE_SUBJECT, OUTBOUND_WIDGET_ME
   );
 
   const refreshIdToken$ = inboundMessage$.pipe(
-    ofType(isRefreshIdTokenWidgetMessage),
+    ofType(isRefreshIdTokenMessage),
     map(inboundMessage => ({
       recipient: Recipient.single(inboundMessage.sender),
       message: {
@@ -57,11 +57,11 @@ createWidgetMessageMiddleware(INBOUND_WIDGET_MESSAGE_SUBJECT, OUTBOUND_WIDGET_ME
 
   return merge(broadcast$, refreshIdToken$);
 
-  function isBroadcastWidgetMessage(message: WidgetMessage): message is { type: `BROADCAST/${string}`, [key: string]: unknown } {
+  function isBroadcastMessage(message: WidgetMessage): message is { type: `BROADCAST/${string}`, [key: string]: unknown } {
     return message.type.startsWith('BROADCAST/');
   }
 
-  function isRefreshIdTokenWidgetMessage(message: WidgetMessage): message is { type: `ID_TOKEN/REFRESH` } {
+  function isRefreshIdTokenMessage(message: WidgetMessage): message is { type: `ID_TOKEN/REFRESH` } {
     return message.type == 'ID_TOKEN/REFRESH';
   }
 })
